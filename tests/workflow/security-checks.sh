@@ -112,6 +112,11 @@ mounts() { $K -n "$NS" get "$pod" -o jsonpath="{.spec.containers[?(@.name==\"$1\
 mounts main | grep -q serviceaccount && r=1 || r=0; check "stage (main) container has no API token mounted" $r
 mounts wait | grep -q serviceaccount; check "Argo wait container has the token it needs" $?
 
+# --- Supply chain: the third-party images running in the cluster are pinned by digest.
+unpinned=$($K get pods -A -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{range .spec.initContainers[*]}{.image}{"\n"}{end}{end}' \
+  | sort -u | grep -E 'quay.io/(calico|argoproj)/' | grep -v '@sha256:')
+[ -z "$unpinned" ]; check "Calico and Argo images are pinned by digest" $?
+
 # --- Persistence across a node restart (disruptive, opt-in).
 if [ "${1:-}" = "--restart-node" ]; then
   $K -n "$NS" apply -f - >/dev/null <<EOF

@@ -17,6 +17,10 @@ kind create cluster --name "$CLUSTER_NAME" --image "$KIND_NODE_IMAGE" --config k
 manifest=$(mktemp)
 curl -fsSL "https://raw.githubusercontent.com/projectcalico/calico/$CALICO_VERSION/manifests/calico.yaml" > "$manifest"
 [ "$(sha256sum < "$manifest" | cut -d" " -f1)" = "$CALICO_MANIFEST_SHA256" ] || { echo "Calico manifest checksum mismatch"; exit 1; }
-kubectl --context "kind-$CLUSTER_NAME" apply --server-side -f - < "$manifest" >/dev/null
+# The manifest only names tags, so add the digests from versions.env before applying.
+sed -E -e "s#(quay.io/calico/calico:$CALICO_VERSION)#\1@$CALICO_CALICO_DIGEST#" \
+  -e "s#(quay.io/calico/node:$CALICO_VERSION)#\1@$CALICO_NODE_DIGEST#" \
+  -e "s#(quay.io/calico/third-party-cni-plugins:$CALICO_VERSION)#\1@$CALICO_CNI_PLUGINS_DIGEST#" "$manifest" \
+  | kubectl --context "kind-$CLUSTER_NAME" apply --server-side -f - >/dev/null
 kubectl --context "kind-$CLUSTER_NAME" wait --for=condition=Ready node --all --timeout=300s
 kubectl --context "kind-$CLUSTER_NAME" apply -f k8s/namespace.yaml -f k8s/service-account.yaml -f k8s/artifact-pvc.yaml -f k8s/network-policy.yaml
