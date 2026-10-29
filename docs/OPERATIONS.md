@@ -103,3 +103,21 @@ tests/workflow/security-checks.sh --restart-node  # adds a kind node restart and
 Exits non-zero if any check fails. What each check proves is listed under Security in
 `docs/ARCHITECTURE.md`. Memory limits in `workflows/training-workflow.yaml` come from measured peaks
 (see the stage table there); re-measure if the dataset grows.
+
+## Failure scenarios (M4)
+
+```bash
+tests/workflow/run-scenarios.sh      # about 4 minutes; needs cluster, Argo and the loaded image
+```
+
+Runs the success path and four failures (invalid data, failed training, failed gate, timeout) and
+asserts exit codes, retry counts, that downstream stages never start, and that the registry is
+byte-identical after each failure. Results: `docs/EVIDENCE.md`. Problems: `docs/TROUBLESHOOTING.md`.
+
+## CI
+
+`.github/workflows/ci.yml` runs on pull requests and pushes: lint, unit tests, `argo lint`,
+`helm template` against the pinned chart, shell syntax checks, manifest parsing, and the image
+builds. The kind cluster tests run only from a manual "Run workflow" dispatch with `cluster`
+ticked. Project 01 is checked out at a pinned commit as a sibling directory, matching the local
+path dependency. Update `PROJECT01_SHA` in the file when you deliberately adopt a newer Project 01.

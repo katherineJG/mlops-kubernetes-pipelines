@@ -1,8 +1,9 @@
 # Architecture
 
 Status: M0 design done; M1 stage CLIs and image built and tested; M2 DAG runs end to end on the
-local kind cluster (one success run, one forced gate failure). Failure-path coverage, timeouts and
-CI are M4.
+local kind cluster. M3: measured limits and verified security controls. M4: success, bad-data,
+failed-training, failed-gate and timeout scenarios pass on the cluster; GitHub Actions workflow written
+but not yet run on GitHub.
 
 ## DAG
 
@@ -77,9 +78,11 @@ Project 01 uses 1 for validation failure and 2 for gate failure. The wrappers tr
 
 Retry rule, as written in `workflows/training-workflow.yaml` (limit 2, backoff 5s ×2):
 `retryPolicy: Always` plus `expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)`.
-Observed on the cluster (Argo v4.1.6): exit 20 ran once and was not retried; exit 1 (a missing
-config file) ran three times. Exit 10 and 30 follow the same expression but have not been run
-through the cluster yet (covered by unit and container tests only); timeouts are untested.
+Observed on the cluster (Argo v4.1.6, see `docs/EVIDENCE.md`): exit 10 and exit 20 each ran once and
+were not retried; exit 1 (a missing config file) ran three times; a timeout ran once and was not
+retried (the pod has no exit code, so the expression evaluates to false). Exit 30 is covered by unit
+tests only. The train timeout is the `train-timeout` workflow parameter (default 600 s) so this path
+can be tested with a tiny value.
 
 Workflow notes: `command: [python, -m]` is set explicitly because the emissary executor cannot read
 the entrypoint of an image that only exists locally. YAML anchors are avoided because `argo lint`
