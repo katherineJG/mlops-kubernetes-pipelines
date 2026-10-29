@@ -20,7 +20,7 @@ spec:
   arguments:
     parameters:
       - name: image
-        value: mlops-stages:m1-local
+        value: mlops-stages:local
       - name: data-config
         value: /app/configs/data.yaml
       - name: model-config

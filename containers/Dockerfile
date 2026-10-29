@@ -1,5 +1,5 @@
 # Stage image: Project 01's image plus the stage CLIs. Build context is the repo root.
-#   docker build -f containers/Dockerfile --build-arg BASE_IMAGE=churn-pipeline:p01-local -t mlops-stages:m1-local .
+#   docker build -f containers/Dockerfile --build-arg BASE_IMAGE=churn-pipeline:p01-local -t mlops-stages:local .
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 WORKDIR /app
