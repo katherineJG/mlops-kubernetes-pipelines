@@ -27,7 +27,7 @@ These workflow objects live in the local cluster and disappear with it (`scripts
 
 ## CI
 
-GitHub Actions run 40942671088 (manual dispatch with the cluster job enabled, 2026-10-29): `static` and
+GitHub Actions run 40953583679 (manual dispatch with the cluster job enabled, 2026-10-29): `static` and
 `cluster` both succeeded. In `cluster`, the security checks and all six scenarios (success and five failures) passed on a fresh kind
 cluster on a GitHub-hosted runner (about 9 min, with Calico and the network and token checks). The same workflow ran on push and `static` passed.
 
