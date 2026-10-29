@@ -1,6 +1,6 @@
 # Operations
 
-Status: verified locally on 2026-10-29: cluster creation, Argo install, image build and load, the workflow, the security checks and the failure scenarios. The GitHub Actions workflow also passes on GitHub, including the opt-in cluster job.
+Status: verified locally on 2026-10-29: cluster creation, Argo install, image build and load, the workflow, the security checks and the failure scenarios. The GitHub Actions workflow also passes on GitHub, including the cluster job.
 
 ## Prerequisites (Windows 11)
 
@@ -98,7 +98,7 @@ omitted, `registry/current.json` is byte-identical afterwards. That test config 
 
 ```bash
 export MSYS_NO_PATHCONV=1
-tests/workflow/security-checks.sh                 # 27 checks, about 1 min, non-destructive
+tests/workflow/security-checks.sh                 # 28 checks, about 1 min, non-destructive
 tests/workflow/security-checks.sh --restart-node  # adds a kind node restart and PVC survival check (~35 s)
 ```
 
@@ -120,8 +120,7 @@ byte-identical after each failure. Results: `docs/EVIDENCE.md`. Problems: `docs/
 
 `.github/workflows/ci.yml` runs on pull requests and pushes: lint, unit tests, `argo lint`,
 `helm template` against the pinned chart, shell syntax checks, manifest parsing, and the image
-builds. The kind cluster tests run only from a manual "Run workflow" dispatch with `cluster`
-ticked. Project 01 is checked out at a pinned commit as a sibling directory, matching the local
+builds. The kind cluster tests (about 9 minutes) also run on every pull request, and from a manual "Run workflow" dispatch with `cluster` ticked. Project 01 is checked out at a pinned commit as a sibling directory, matching the local
 path dependency. Update `PROJECT01_SHA` in the file when you deliberately adopt a newer Project 01.
 
 ## Resource and dataset-size tests

@@ -55,5 +55,5 @@ and every stage succeeded (run `churn-training-j64pb`: ingest 15 s, validate 8 s
 
 ## Not shown by these runs
 
-- The cluster CI job on pull requests: it runs only when started by hand.
+- The cluster CI job on a pull request from a fork: the job needs no secrets, but it has not been tried.
 - Datasets beyond 2,000,000 rows, or real (non-synthetic) data, whose shape may use more memory per row.
