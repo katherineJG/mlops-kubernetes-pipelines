@@ -2,7 +2,7 @@
 
 Status: the stage CLIs, image and Argo DAG run end to end on the local kind cluster. Resource limits
 are measured, security controls are verified, and the success, bad-data, failed-training, failed-gate,
-timeout and missing-artifact scenarios pass. The GitHub Actions workflow passes on GitHub, including the opt-in cluster job (run 40953583679).
+timeout and missing-artifact scenarios pass. The GitHub Actions workflow passes on GitHub, including the cluster job (run 40953583679).
 
 ## DAG
 
@@ -117,7 +117,7 @@ gate result, timestamp.
 
 ## Security
 
-Verified on the live cluster by `tests/workflow/security-checks.sh` (27 checks by default, 28 with `--restart-node`; all passing on 2026-10-29):
+Verified on the live cluster by `tests/workflow/security-checks.sh` (28 checks by default, 29 with `--restart-node`; all passing on 2026-10-29):
 
 - Dedicated namespace `ml-workflows` enforcing the `restricted` pod-security level. A privileged pod, a
   root pod and an escalating pod are each rejected; a compliant pod is admitted.
@@ -134,7 +134,7 @@ Verified on the live cluster by `tests/workflow/security-checks.sh` (27 checks b
 - Stage containers have no API token (`automountServiceAccountToken: false`). Only Argo's init and wait
   containers mount one, from a dedicated token Secret that the workflow's `executor.serviceAccountName`
   names. A pod spec check and a completed workflow confirm both halves.
-- Third-party images (Argo controller, executor, CRD installer, busybox) are pinned by digest.
+- Third-party images (Argo controller, executor, CRD installer, busybox, and the three Calico images) are pinned by digest; a check fails if any running Calico or Argo image is not.
 - Artifacts on the PVC survive pod and workflow deletion and a restart of the kind node.
 - No tracked file contains a private key or AWS-style key. The only Secret manifest is the empty service-account-token request, checked to carry no data.
 
@@ -156,7 +156,7 @@ ServiceAccount `get` on that one secret by name only.
 - `reclaimPolicy: Delete` on kind's default storage class means deleting the PVC or cluster deletes the
   artifacts. Back up `/artifacts/registry` before cleanup if the model matters.
 - The stage and Project 01 images are tag-pinned only: they exist only in the local Docker daemon and the
-  kind node, so there is no registry digest to pin. Calico images come from the pinned manifest by tag.
+  kind node, so there is no registry digest to pin.
 
 ## Retention and cleanup
 
