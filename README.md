@@ -19,7 +19,7 @@ in `.github/workflows/ci.yml`). Run from Git Bash or WSL with Docker running; `u
 
 ```bash
 git clone https://github.com/katherineJG/mlops-reproducible-training "Reproducible ML Training Pipeline"
-git -C "Reproducible ML Training Pipeline" checkout a3c18b12f5bf2f3ccf23c8c838e1bcd2ca4fcf07
+git -C "Reproducible ML Training Pipeline" checkout 485f76ebf90cf00f1f4481df1817f67e678b4d78
 git clone https://github.com/katherineJG/mlops-kubernetes-pipelines && cd mlops-kubernetes-pipelines
 
 source versions.env
