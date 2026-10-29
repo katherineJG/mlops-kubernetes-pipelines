@@ -24,8 +24,14 @@ identical before and after, and no `registry/models/<run>` exists for the failed
 
 These workflow objects live in the local cluster and disappear with it (`scripts/cleanup.sh`).
 
+## CI
+
+GitHub Actions run 40923177683 (manual dispatch with the cluster job enabled, 2026-10-29): `static` and
+`cluster` both succeeded. In `cluster`, the security checks and all five scenarios passed on a fresh kind
+cluster on a GitHub-hosted runner (7 min 43 s). The same workflow ran on push and `static` passed.
+
 ## Not shown by these runs
 
 - Exit code 30 end to end on the cluster (covered by unit tests only).
-- The GitHub Actions workflow itself: its steps were run locally, but it has not run on GitHub.
+- The cluster CI job on pull requests: it runs only when started by hand.
 - Behavior with datasets larger than the 5,000-row fixture.

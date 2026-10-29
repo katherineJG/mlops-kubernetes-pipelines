@@ -1,6 +1,6 @@
 # Operations
 
-Status: verified locally on 2026-10-29: cluster creation, Argo install, image build and load, the workflow, the security checks and the failure scenarios. The GitHub Actions workflow has not yet run on GitHub.
+Status: verified locally on 2026-10-29: cluster creation, Argo install, image build and load, the workflow, the security checks and the failure scenarios. The GitHub Actions workflow also passes on GitHub, including the opt-in cluster job.
 
 ## Prerequisites (Windows 11)
 
