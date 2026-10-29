@@ -14,7 +14,7 @@ env:
   # Project 01 is a path dependency (../Reproducible ML Training Pipeline). Pinned to a commit so a
   # change over there cannot silently break or alter this repo's CI.
   PROJECT01_REPO: katherineJG/mlops-reproducible-training
-  PROJECT01_SHA: a3c18b12f5bf2f3ccf23c8c838e1bcd2ca4fcf07
+  PROJECT01_SHA: 485f76ebf90cf00f1f4481df1817f67e678b4d78
 
 jobs:
   static:
