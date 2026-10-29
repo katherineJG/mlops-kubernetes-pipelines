@@ -1,0 +1,52 @@
+# Cluster smoke test: two independent pods hand a file over the artifacts PVC, non-root, restricted
+# pod-security. Proves Argo, RBAC, scheduling and PVC persistence work before any ML code exists.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: smoke-
+  namespace: ml-workflows
+spec:
+  serviceAccountName: ml-workflow
+  entrypoint: main
+  activeDeadlineSeconds: 120
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+    - name: artifacts
+      persistentVolumeClaim:
+        claimName: artifacts
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: write
+            template: sh
+            arguments:
+              parameters:
+                - {name: cmd, value: "mkdir -p /artifacts/smoke && echo hello-from-write > /artifacts/smoke/{{workflow.name}}.txt"}
+          - name: read
+            depends: write.Succeeded
+            template: sh
+            arguments:
+              parameters:
+                - {name: cmd, value: "test \"$(cat /artifacts/smoke/{{workflow.name}}.txt)\" = hello-from-write"}
+    - name: sh
+      inputs:
+        parameters:
+          - name: cmd
+      container:
+        image: busybox:1.37.0
+        command: [sh, -c, "{{inputs.parameters.cmd}}"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+        resources:
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {cpu: 100m, memory: 64Mi}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}

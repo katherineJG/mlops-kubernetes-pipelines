@@ -1,0 +1,19 @@
+# Argo Workflows chart overrides. Key names are chart-specific: check against the pinned chart's
+# values (helm show values argo/argo-workflows --version <ARGO_CHART_VERSION>) before first install.
+server:
+  enabled: false   # UI not needed for the CLI-driven demo; smaller attack surface
+controller:
+  workflowNamespaces:
+    - ml-workflows
+# Restricted pod-security in ml-workflows rejects the executor init/wait containers unless set.
+executor:
+  image:
+    nonroot: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    seccompProfile:
+      type: RuntimeDefault

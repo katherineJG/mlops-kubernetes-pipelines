@@ -1,0 +1,12 @@
+# Standalone PVC (not a workflow volumeClaimTemplate) so artifacts outlive any workflow.
+# The kind "standard" class has reclaimPolicy Delete: deleting this PVC deletes the data.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: artifacts
+  namespace: ml-workflows
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

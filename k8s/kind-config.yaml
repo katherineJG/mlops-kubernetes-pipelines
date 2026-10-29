@@ -1,0 +1,5 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# Single node on purpose: the artifact PVC is ReadWriteOnce (kind's default local-path storage).
+nodes:
+  - role: control-plane
