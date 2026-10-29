@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       cluster:
-        description: "Also run the kind cluster tests (about 15 minutes)"
+        description: "Also run the kind cluster tests (about 9 minutes; always runs on pull requests)"
         type: boolean
         default: false
 
@@ -65,9 +65,10 @@ jobs:
           docker build -t "$BASE_IMAGE" "../Reproducible ML Training Pipeline"
           docker build -f containers/Dockerfile --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$STAGE_IMAGE" .
 
-  # Opt-in: creates a kind cluster, installs Argo, runs the security checks and failure scenarios.
+  # Creates a kind cluster, installs Argo, runs the security checks and failure scenarios (about 9 minutes).
+  # Runs on every pull request, and on manual dispatch with the `cluster` box ticked.
   cluster:
-    if: github.event_name == 'workflow_dispatch' && inputs.cluster
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.cluster)
     needs: static
     runs-on: ubuntu-latest
     timeout-minutes: 40
