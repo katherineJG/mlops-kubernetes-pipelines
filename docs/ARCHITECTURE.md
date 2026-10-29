@@ -51,12 +51,12 @@ run dir, no network access, runs as non-root, read-only root filesystem where po
 
 | Stage | Inputs | Outputs (under `/artifacts/runs/<run-id>/`) | Resources (req/limit) | Timeout |
 |---|---|---|---|---|
-| validate | `--input` CSV + `provenance.json` | `validation.json` (rules checked, row count, dataset sha256) | 100m/500m CPU, 256Mi/512Mi | 2m |
-| train | `--input`, `--model-config` | `models/baseline.joblib`, `models/candidate.joblib`, `train.json` | 500m/2 CPU, 512Mi/2Gi | 10m |
-| evaluate | `models/`, `--input`, `--model-config` | `metrics.json`, `report.md`, `gate.json` | 250m/1 CPU, 512Mi/1Gi | 5m |
-| promote | run dir | `registry/models/<run-id>/`, updated `registry/current.json` | 50m/200m CPU, 64Mi/128Mi | 1m |
+| validate | `--input` CSV + `provenance.json` | `validation.json` (rules checked, row count, dataset sha256) | 100m/500m CPU, 160Mi/384Mi | 2m |
+| train | `--input`, `--model-config` | `models/baseline.joblib`, `models/candidate.joblib`, `train.json` | 500m/2 CPU, 384Mi/768Mi | 10m |
+| evaluate | `models/`, `--input`, `--model-config` | `metrics.json`, `report.md`, `gate.json` | 250m/1 CPU, 384Mi/768Mi | 5m |
+| promote | run dir | `registry/models/<run-id>/`, updated `registry/current.json` | 50m/200m CPU, 128Mi/256Mi | 1m |
 
-Resource numbers are starting estimates, not yet measured (Argo runs are M2). The stages take
+Memory figures come from measured peaks on the 5,000-row fixture (ingest 126 MiB, validate 137, train 267, evaluate 263, promote 123), at roughly 2-3x headroom; a full run under them had no OOM kills. Larger datasets need re-measuring. The ingest stage is not in the table: 100m/1 CPU, 160Mi/384Mi, 2m. CPU limits are unmeasured guesses (train used about 2 cores for 2.5 s). The stages take
 `--input-dir`/`--run-dir` rather than a single `--input` file. Each stage also checks its own
 precondition (train needs a passed `validation.json`, evaluate needs `train.json`, promote needs a
 passed `gate.json`), so a mis-wired DAG still cannot promote. The image sets `HOME=/tmp`; mount an
@@ -115,11 +115,35 @@ gate result, timestamp.
 
 ## Security
 
-- Dedicated namespace `ml-workflows`; a ServiceAccount granting only what the Argo executor needs
-  (create/patch `workflowtaskresults`). No cluster-wide roles.
-- `runAsNonRoot`, `allowPrivilegeEscalation: false`, drop all capabilities, `seccompProfile: RuntimeDefault`.
-- No secrets in v1 (no external store). If one is added later, use a Kubernetes Secret created out of
-  band and never committed.
+Verified on the live cluster by `tests/workflow/security-checks.sh` (21 checks by default, 22 with `--restart-node`; all passing on 2026-10-29):
+
+- Dedicated namespace `ml-workflows` enforcing the `restricted` pod-security level. A privileged pod, a
+  root pod and an escalating pod are each rejected; a compliant pod is admitted.
+- ServiceAccount `ml-workflow` can only create and patch `workflowtaskresults` in its own namespace. It
+  cannot read secrets or configmaps, list or create pods, create workflows, delete PVCs, act in another
+  namespace or touch cluster-wide resources.
+- Containers run as uid 65532 with no Linux capabilities, a read-only root filesystem, `/tmp` as an
+  `emptyDir` and the artifacts PVC as the only writable paths, plus `allowPrivilegeEscalation: false` and
+  the `RuntimeDefault` seccomp profile.
+- Artifacts on the PVC survive pod and workflow deletion and a restart of the kind node.
+- No tracked file contains a private key, AWS-style key or Kubernetes Secret manifest.
+
+### Credentials
+
+v1 uses no credentials: the artifact store is a local PVC and images are loaded into kind, not pulled
+from a registry. If an external store or registry is added later: create the Kubernetes Secret out of
+band with `kubectl create secret`, reference it by name from the workflow, never commit the manifest
+(`.gitignore` already excludes `*.key`, `*.pem`, `.env`, `kubeconfig*`), and give the workflow
+ServiceAccount `get` on that one secret by name only.
+
+### Known limits
+
+- No NetworkPolicy: pods can reach the network and each other. The stage code makes no network calls
+  (tested with `--network none`), but the cluster does not enforce it.
+- The workflow ServiceAccount token is mounted because the Argo executor needs it.
+- `reclaimPolicy: Delete` on kind's default storage class means deleting the PVC or cluster deletes the
+  artifacts. Back up `/artifacts/registry` before cleanup if the model matters.
+- Images are tagged, not digest-pinned; they exist only in the local Docker daemon and the kind node.
 
 ## Retention and cleanup
 

@@ -74,8 +74,8 @@ spec:
           - {name: artifacts, mountPath: /artifacts}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 256Mi}
-          limits: {cpu: "1", memory: 512Mi}
+          requests: {cpu: 100m, memory: 160Mi}
+          limits: {cpu: "1", memory: 384Mi}  # measured peak 126 MiB
         args:
           - churn_pipeline.ingest
           - --config
@@ -102,8 +102,8 @@ spec:
           - {name: artifacts, mountPath: /artifacts}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 100m, memory: 256Mi}
-          limits: {cpu: 500m, memory: 512Mi}
+          requests: {cpu: 100m, memory: 160Mi}
+          limits: {cpu: 500m, memory: 384Mi}  # measured peak 137 MiB
         args:
           - mlops_stages.validate
           - --input-dir
@@ -130,8 +130,8 @@ spec:
           - {name: artifacts, mountPath: /artifacts}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 500m, memory: 512Mi}
-          limits: {cpu: "2", memory: 2Gi}
+          requests: {cpu: 500m, memory: 384Mi}
+          limits: {cpu: "2", memory: 768Mi}  # measured peak 267 MiB, ~2 cores for 2.5 s
         args:
           - mlops_stages.train
           - --input-dir
@@ -162,8 +162,8 @@ spec:
           - {name: artifacts, mountPath: /artifacts}
           - {name: tmp, mountPath: /tmp}
         resources:
-          requests: {cpu: 250m, memory: 512Mi}
-          limits: {cpu: "1", memory: 1Gi}
+          requests: {cpu: 250m, memory: 384Mi}
+          limits: {cpu: "1", memory: 768Mi}  # measured peak 263 MiB
         args:
           - mlops_stages.evaluate
           - --input-dir
@@ -195,7 +195,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 50m, memory: 128Mi}
-          limits: {cpu: 200m, memory: 256Mi}
+          limits: {cpu: 200m, memory: 256Mi}  # measured peak 123 MiB (imports pandas via shared code)
         args:
           - mlops_stages.promote
           - --run-dir

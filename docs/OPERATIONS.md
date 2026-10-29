@@ -91,3 +91,15 @@ Forced gate failure: put a model config with an unreachable gate on the PVC (for
 `/artifacts/configs/strict.yaml` with `min_roc_auc: 0.999`) and pass
 `-p model-config=/artifacts/configs/strict.yaml`. Result: `evaluate` exits 20 once, `promote` is
 omitted, `registry/current.json` is byte-identical afterwards. That test config is left on the PVC.
+
+## Security checks (M3)
+
+```bash
+export MSYS_NO_PATHCONV=1
+tests/workflow/security-checks.sh                 # 21 checks, about 20 s, non-destructive
+tests/workflow/security-checks.sh --restart-node  # adds a kind node restart and PVC survival check (~35 s)
+```
+
+Exits non-zero if any check fails. What each check proves is listed under Security in
+`docs/ARCHITECTURE.md`. Memory limits in `workflows/training-workflow.yaml` come from measured peaks
+(see the stage table there); re-measure if the dataset grows.
