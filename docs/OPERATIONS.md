@@ -1,6 +1,6 @@
-﻿# Operations (M0)
+# Operations
 
-Status: cluster created and Argo installed 2026-10-29; `tests/workflow/smoke.yaml` passed (see below). Image build commands (M1) not run yet.
+Status: verified locally on 2026-10-29: cluster creation, Argo install, image build and load, the workflow, the security checks and the failure scenarios. The GitHub Actions workflow has not yet run on GitHub.
 
 ## Prerequisites (Windows 11)
 
@@ -16,7 +16,7 @@ Status: cluster created and Argo installed 2026-10-29; `tests/workflow/smoke.yam
 
 Local resources: the host has 16 logical CPUs and about 32 GB RAM; Docker Desktop currently
 gets 16 CPUs and about 15.6 GB. The kind node plus Argo should
-need roughly 2 CPUs and 4 GB; measure and update in M2.
+need roughly 2 CPUs and 4 GB; estimated, not measured.
 
 ## Create
 
@@ -26,7 +26,7 @@ source versions.env        # fill ARGO_CHART_VERSION first
 ./scripts/install-argo.sh
 ```
 
-## Build and load images (M1)
+## Build and load images
 
 ```bash
 docker build -t "$BASE_IMAGE" "../Reproducible ML Training Pipeline"
@@ -61,7 +61,7 @@ Notes learned during setup:
   only pass with `executor.securityContext` and the `-nonroot` image set in `helm/values.yaml`.
 - In Git Bash, `kind`, `helm` and `argo` may not be on PATH until a new shell is opened.
 
-## Run the stage tests (M1)
+## Run the stage tests
 
 ```bash
 uv sync
@@ -73,7 +73,7 @@ The same stages were also run inside the built image with `--read-only --tmpfs /
 --network none`: happy path (all exit 0), corrupt data (validate exit 10), failing gate (evaluate
 exit 20, promote exit 30, registry unchanged).
 
-## Run the workflow (M2)
+## Run the workflow
 
 ```bash
 export MSYS_NO_PATHCONV=1        # Git Bash otherwise rewrites /artifacts/... arguments into C:/Program Files/Git/...
@@ -92,7 +92,7 @@ Forced gate failure: put a model config with an unreachable gate on the PVC (for
 `-p model-config=/artifacts/configs/strict.yaml`. Result: `evaluate` exits 20 once, `promote` is
 omitted, `registry/current.json` is byte-identical afterwards. That test config is left on the PVC.
 
-## Security checks (M3)
+## Security checks
 
 ```bash
 export MSYS_NO_PATHCONV=1
@@ -104,7 +104,7 @@ Exits non-zero if any check fails. What each check proves is listed under Securi
 `docs/ARCHITECTURE.md`. Memory limits in `workflows/training-workflow.yaml` come from measured peaks
 (see the stage table there); re-measure if the dataset grows.
 
-## Failure scenarios (M4)
+## Failure scenarios
 
 ```bash
 tests/workflow/run-scenarios.sh      # about 4 minutes; needs cluster, Argo and the loaded image
