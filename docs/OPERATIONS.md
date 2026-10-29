@@ -26,6 +26,8 @@ source versions.env        # fill ARGO_CHART_VERSION first
 ./scripts/install-argo.sh
 ```
 
+`create-cluster.sh` replaces kind's default network layer with Calico (`CALICO_VERSION` in `versions.env`; the manifest is fetched from GitHub and checked against `CALICO_MANIFEST_SHA256`), so it needs internet access and takes about a minute longer. Calico is what makes the default-deny `NetworkPolicy` apply.
+
 ## Build and load images
 
 ```bash
@@ -96,7 +98,7 @@ omitted, `registry/current.json` is byte-identical afterwards. That test config 
 
 ```bash
 export MSYS_NO_PATHCONV=1
-tests/workflow/security-checks.sh                 # 21 checks, about 20 s, non-destructive
+tests/workflow/security-checks.sh                 # 27 checks, about 1 min, non-destructive
 tests/workflow/security-checks.sh --restart-node  # adds a kind node restart and PVC survival check (~35 s)
 ```
 
@@ -121,3 +123,14 @@ byte-identical after each failure. Results: `docs/EVIDENCE.md`. Problems: `docs/
 builds. The kind cluster tests run only from a manual "Run workflow" dispatch with `cluster`
 ticked. Project 01 is checked out at a pinned commit as a sibling directory, matching the local
 path dependency. Update `PROJECT01_SHA` in the file when you deliberately adopt a newer Project 01.
+
+## Resource and dataset-size tests
+
+```bash
+tests/perf/run.sh "5000 500000 2000000"                  # peak memory and CPU per stage, in the stage image
+MEMORY=768m CPUS=2 tests/perf/run.sh "1000000"            # same run under a pod-sized limit (exit -9 = OOM kill)
+tests/workflow/large-dataset.sh 2000000                  # whole workflow on the cluster, 2M rows (~2 min)
+```
+
+Results are in `docs/EVIDENCE.md`. Re-run them when the dataset or model changes, then adjust the
+limits in `workflows/training-workflow.yaml`.

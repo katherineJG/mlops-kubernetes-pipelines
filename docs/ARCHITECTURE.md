@@ -51,12 +51,12 @@ run dir, no network access, runs as non-root, read-only root filesystem where po
 
 | Stage | Inputs | Outputs (under `/artifacts/runs/<run-id>/`) | Resources (req/limit) | Timeout |
 |---|---|---|---|---|
-| validate | `--input` CSV + `provenance.json` | `validation.json` (rules checked, row count, dataset sha256) | 100m/500m CPU, 160Mi/384Mi | 2m |
-| train | `--input`, `--model-config` | `models/baseline.joblib`, `models/candidate.joblib`, `train.json` | 500m/2 CPU, 384Mi/768Mi | 10m |
-| evaluate | `models/`, `--input`, `--model-config` | `metrics.json`, `report.md`, `gate.json` | 250m/1 CPU, 384Mi/768Mi | 5m |
-| promote | run dir | `registry/models/<run-id>/`, updated `registry/current.json` | 50m/200m CPU, 128Mi/256Mi | 1m |
+| validate | `--input` CSV + `provenance.json` | `validation.json` (rules checked, row count, dataset sha256) | 100m/1 CPU, 160Mi/1280Mi | 2m |
+| train | `--input`, `--model-config` | `models/baseline.joblib`, `models/candidate.joblib`, `train.json` | 500m/2 CPU, 384Mi/2560Mi | 10m |
+| evaluate | `models/`, `--input`, `--model-config` | `metrics.json`, `report.md`, `gate.json` | 250m/1 CPU, 384Mi/1536Mi | 5m |
+| promote | run dir | `registry/models/<run-id>/`, updated `registry/current.json` | 50m/500m CPU, 128Mi/256Mi | 1m |
 
-Memory figures come from measured peaks on the 5,000-row fixture (ingest 126 MiB, validate 137, train 267, evaluate 263, promote 123), at roughly 2-3x headroom; a full run under them had no OOM kills. Larger datasets need re-measuring. The ingest stage is not in the table: 100m/1 CPU, 160Mi/384Mi, 2m. CPU limits are unmeasured guesses (train used about 2 cores for 2.5 s). The stages take
+Limits come from measured peaks on synthetic datasets of 5,000 to 2,000,000 rows (`tests/perf/run.sh`, see `docs/EVIDENCE.md`). Peak memory grows with rows, about 0.5 MiB per 1,000 for ingest and 0.9 for train (train: 266 MiB at 5k rows, 719 at 500k, 1,987 at 2M); the limits cover 2M rows with 20% or more headroom, and a 2M-row run passed on the cluster under them. The ingest stage is not in the table: 100m/1 CPU, 160Mi/1536Mi, 2m. Beyond about 2M rows the memory limits need raising: under the old 768Mi train limit a 1M-row run was OOM-killed. CPU limits matter little: train used 11.1 s of wall time on 1 CPU against 9.9 s on 2 CPUs at 500k rows (it uses up to about 3 cores when allowed). The stages take
 `--input-dir`/`--run-dir` rather than a single `--input` file. Each stage also checks its own
 precondition (train needs a passed `validation.json`, evaluate needs `train.json`, promote needs a
 passed `gate.json`), so a mis-wired DAG still cannot promote. The image sets `HOME=/tmp`; mount an
@@ -117,7 +117,7 @@ gate result, timestamp.
 
 ## Security
 
-Verified on the live cluster by `tests/workflow/security-checks.sh` (21 checks by default, 22 with `--restart-node`; all passing on 2026-10-29):
+Verified on the live cluster by `tests/workflow/security-checks.sh` (27 checks by default, 28 with `--restart-node`; all passing on 2026-10-29):
 
 - Dedicated namespace `ml-workflows` enforcing the `restricted` pod-security level. A privileged pod, a
   root pod and an escalating pod are each rejected; a compliant pod is admitted.
@@ -127,8 +127,16 @@ Verified on the live cluster by `tests/workflow/security-checks.sh` (21 checks b
 - Containers run as uid 65532 with no Linux capabilities, a read-only root filesystem, `/tmp` as an
   `emptyDir` and the artifacts PVC as the only writable paths, plus `allowPrivilegeEscalation: false` and
   the `RuntimeDefault` seccomp profile.
+- Default-deny NetworkPolicy in `ml-workflows`: no ingress, and egress only to the Kubernetes API (TCP 6443). A
+  probe pod cannot reach the internet but can reach the API. This needs a CNI that enforces policy, so
+  `create-cluster.sh` replaces kind's default CNI with Calico (pinned, manifest checksum verified); without
+  it the policy objects are accepted and ignored.
+- Stage containers have no API token (`automountServiceAccountToken: false`). Only Argo's init and wait
+  containers mount one, from a dedicated token Secret that the workflow's `executor.serviceAccountName`
+  names. A pod spec check and a completed workflow confirm both halves.
+- Third-party images (Argo controller, executor, CRD installer, busybox) are pinned by digest.
 - Artifacts on the PVC survive pod and workflow deletion and a restart of the kind node.
-- No tracked file contains a private key, AWS-style key or Kubernetes Secret manifest.
+- No tracked file contains a private key or AWS-style key. The only Secret manifest is the empty service-account-token request, checked to carry no data.
 
 ### Credentials
 
@@ -140,12 +148,15 @@ ServiceAccount `get` on that one secret by name only.
 
 ### Known limits
 
-- No NetworkPolicy: pods can reach the network and each other. The stage code makes no network calls
-  (tested with `--network none`), but the cluster does not enforce it.
-- The workflow ServiceAccount token is mounted because the Argo executor needs it.
+- The executor token Secret is a long-lived (non-expiring) service-account token. Its only permission is
+  create/patch of `workflowtaskresults` in `ml-workflows`, and the stage containers cannot read it. A
+  compromised Argo init/wait container could use it, but only for that.
+- The NetworkPolicy egress rule allows TCP 6443 to any address (the post-translation API port), not only
+  the control-plane IP, because that IP changes per cluster.
 - `reclaimPolicy: Delete` on kind's default storage class means deleting the PVC or cluster deletes the
   artifacts. Back up `/artifacts/registry` before cleanup if the model matters.
-- Images are tagged, not digest-pinned; they exist only in the local Docker daemon and the kind node.
+- The stage and Project 01 images are tag-pinned only: they exist only in the local Docker daemon and the
+  kind node, so there is no registry digest to pin. Calico images come from the pinned manifest by tag.
 
 ## Retention and cleanup
 
