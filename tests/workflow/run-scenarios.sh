@@ -141,6 +141,13 @@ t=$(attempts "$w" train)
 for s in evaluate promote; do [ "$(count "$(attempts "$w" $s)")" = 0 ]; check "  $s never started" $?; done
 no_promotion "$w" "$good"; check "  registry unchanged, no promoted model" $?
 
+echo "== scenario 5: missing upstream artifact (deterministic, exit 30)"
+# evaluate on its own: the run directory is new, so train.json does not exist
+w=$(submit --entrypoint evaluate)
+[ "$($K get wf "$w" -o jsonpath='{.status.phase}')" = "Failed" ]; check "workflow fails ($w)" $?
+[ "$(attempts "$w" evaluate)" = "Failed:30" ]; check "  evaluate exited 30 and was not retried" $?
+no_promotion "$w" "$good"; check "  registry unchanged, no promoted model" $?
+
 echo
 [ "$fails" -eq 0 ] && echo "all scenarios passed" || echo "$fails check(s) FAILED"
 [ "$fails" -eq 0 ]

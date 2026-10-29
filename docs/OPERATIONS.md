@@ -110,7 +110,7 @@ Exits non-zero if any check fails. What each check proves is listed under Securi
 tests/workflow/run-scenarios.sh      # about 4 minutes; needs cluster, Argo and the loaded image
 ```
 
-Runs the success path and four failures (invalid data, failed training, failed gate, timeout) and
+Runs the success path and five failures (invalid data, failed training, failed gate, timeout, missing upstream artifact) and
 asserts exit codes, retry counts, that downstream stages never start, and that the registry is
 byte-identical after each failure. Results: `docs/EVIDENCE.md`. Problems: `docs/TROUBLESHOOTING.md`.
 

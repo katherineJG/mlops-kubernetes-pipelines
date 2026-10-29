@@ -13,11 +13,12 @@ flowchart LR
 
 | Scenario | Run | Outcome | Attempts per stage | Registry |
 |---|---|---|---|---|
-| Success | `churn-training-vt5m7` | Succeeded | each stage once, exit 0 | `current.json` points at this run |
-| Invalid data | `churn-training-lzkm9` | Failed at validate | validate once, exit 10 (no retry); train, evaluate, promote never started | unchanged |
-| Failed training | `churn-training-6p7lh` | Failed at train | train 3 times, all exit 1 (1 + 2 retries); evaluate, promote never started | unchanged |
-| Failed gate | `churn-training-8s5bn` | Failed at evaluate | evaluate once, exit 20 (no retry); promote never started; `gate.json` has `passed: false` | unchanged |
-| Timeout | `churn-training-7t6s4` | Failed at train | train once, no exit code, "longer than the specified deadline", retry expression evaluated to false; evaluate, promote never started | unchanged |
+| Success | `churn-training-88z8l` | Succeeded | each stage once, exit 0 | `current.json` points at this run |
+| Invalid data | `churn-training-gmdq6` | Failed at validate | validate once, exit 10 (no retry); train, evaluate, promote never started | unchanged |
+| Failed training | `churn-training-bx5l2` | Failed at train | train 3 times, all exit 1 (1 + 2 retries); evaluate, promote never started | unchanged |
+| Failed gate | `churn-training-rblcv` | Failed at evaluate | evaluate once, exit 20 (no retry); promote never started; `gate.json` has `passed: false` | unchanged |
+| Timeout | `churn-training-c7b7q` | Failed at train | train once, no exit code, "longer than the specified deadline", retry expression evaluated to false; evaluate, promote never started | unchanged |
+| Missing upstream artifact | `churn-training-9wdnz` | Failed at evaluate | `evaluate` submitted alone (`--entrypoint evaluate`), so `train.json` is absent: exit 30 once, no retry, log says "required artifact missing"; promote never started | unchanged |
 
 "Unchanged" means the SHA-256 of `registry/current.json` and the list of `registry/models/` were
 identical before and after, and no `registry/models/<run>` exists for the failed run.
@@ -32,6 +33,5 @@ cluster on a GitHub-hosted runner (7 min 43 s). The same workflow ran on push an
 
 ## Not shown by these runs
 
-- Exit code 30 end to end on the cluster (covered by unit tests only).
 - The cluster CI job on pull requests: it runs only when started by hand.
 - Behavior with datasets larger than the 5,000-row fixture.

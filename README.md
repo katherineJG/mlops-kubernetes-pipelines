@@ -3,7 +3,7 @@
 Containerized ML workflow (validate → train → evaluate → promote) run as an Argo Workflows DAG on a
 local kind cluster. Reuses Project 01's churn pipeline image.
 
-**Status: working locally.** The DAG runs end to end on kind; success and four failure scenarios pass with security controls verified. The GitHub Actions workflow also passes on GitHub, including the opt-in cluster job.
+**Status: working locally.** The DAG runs end to end on kind; success and five failure scenarios pass with security controls verified. The GitHub Actions workflow also passes on GitHub, including the opt-in cluster job.
 
 **Local requirements:** Docker Desktop, kind, helm, kubectl and the argo CLI (pinned in `versions.env`).
 The kind node plus Argo should need about 2 CPUs and 4 GB RAM (estimated, not measured), and the stage
