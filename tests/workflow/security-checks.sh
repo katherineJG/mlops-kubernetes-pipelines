@@ -10,7 +10,7 @@ source versions.env
 K="kubectl --context kind-$CLUSTER_NAME"
 NS="$WORKFLOW_NAMESPACE"
 SA="system:serviceaccount:$NS:ml-workflow"
-PROBE_IMAGE=busybox:1.37.0
+PROBE_IMAGE=busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
 fails=0
 
 check() { # check <description> <0|1 for pass|fail>
@@ -78,8 +78,39 @@ has "tmp=writable"; check "/tmp (emptyDir) is writable" $?
 has "artifacts=writable"; check "/artifacts (PVC) is writable by the non-root user" $?
 
 # --- Secrets hygiene: nothing secret-shaped is tracked in git.
-if git ls-files | xargs grep -I -l -E '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|kind: Secret)' 2>/dev/null | grep -v '^tests/workflow/security-checks.sh$' | grep -q .; then r=1; else r=0; fi
+if git ls-files | xargs grep -I -l -E '(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|kind: Secret)' 2>/dev/null | grep -v -e '^tests/workflow/security-checks.sh$' -e '^k8s/service-account.yaml$' | grep -q .; then r=1; else r=0; fi
 check "no secrets or private keys in tracked files" $r
+# The one allowed Secret manifest is the empty service-account-token request (the API server fills it in).
+grep -qE "^(data|stringData):" k8s/service-account.yaml && r=1 || r=0; check "the token Secret manifest carries no data" $r
+
+# --- Network: default-deny egress except the Kubernetes API (needs a CNI that enforces policy, see create-cluster.sh).
+$K -n "$NS" delete pod net-probe --ignore-not-found --now >/dev/null 2>&1
+$K -n "$NS" apply -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Pod
+metadata: {name: net-probe}
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext: {runAsNonRoot: true, runAsUser: 65532, seccompProfile: {type: RuntimeDefault}}
+  containers:
+    - name: p
+      image: $PROBE_IMAGE
+      command: [sh, -c, "nc -z -w3 1.1.1.1 443 && echo internet=open || echo internet=blocked; nc -z -w3 10.96.0.1 443 && echo api=open || echo api=blocked"]
+      securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+YAML
+$K -n "$NS" wait --for=jsonpath='{.status.phase}'=Succeeded pod/net-probe --timeout=90s >/dev/null 2>&1
+net=$($K -n "$NS" logs net-probe 2>&1); $K -n "$NS" delete pod net-probe --now >/dev/null 2>&1
+echo "$net" | grep -q internet=blocked; check "pods cannot reach the internet" $?
+echo "$net" | grep -q api=open; check "pods can still reach the Kubernetes API (Argo needs it)" $?
+
+# --- API token: only Argo's own containers get one, not the stage container.
+w=$(argo --context "kind-$CLUSTER_NAME" submit tests/workflow/smoke.yaml -n "$NS" --wait -o name 2>/dev/null | tail -1)
+pod=$($K -n "$NS" get pods -l "workflows.argoproj.io/workflow=$w" -o name | head -1)
+[ "$($K -n "$NS" get wf "$w" -o jsonpath='{.status.phase}')" = Succeeded ]; check "workflow without a stage API token still runs to completion" $?
+mounts() { $K -n "$NS" get "$pod" -o jsonpath="{.spec.containers[?(@.name==\"$1\")].volumeMounts[*].mountPath}"; }
+mounts main | grep -q serviceaccount && r=1 || r=0; check "stage (main) container has no API token mounted" $r
+mounts wait | grep -q serviceaccount; check "Argo wait container has the token it needs" $?
 
 # --- Persistence across a node restart (disruptive, opt-in).
 if [ "${1:-}" = "--restart-node" ]; then

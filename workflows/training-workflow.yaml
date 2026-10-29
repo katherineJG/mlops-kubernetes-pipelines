@@ -11,6 +11,10 @@ metadata:
   namespace: ml-workflows
 spec:
   serviceAccountName: ml-workflow
+  # Stage containers get no API token; only Argo's own init/wait containers do (executor.serviceAccountName).
+  automountServiceAccountToken: false
+  executor:
+    serviceAccountName: ml-workflow
   entrypoint: pipeline
   activeDeadlineSeconds: 1200  # whole-run cap on top of the per-stage ones
   arguments:

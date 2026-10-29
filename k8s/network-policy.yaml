@@ -1,0 +1,15 @@
+# Default-deny in the workflow namespace: no ingress, and egress only to the Kubernetes API server
+# (TCP 6443 after kube-proxy's translation), which Argo's init/wait containers need to report results.
+# Stage code needs no network at all. Enforced only on a CNI that implements NetworkPolicy
+# (Calico in this repo; kind's default kindnet silently ignores these objects).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-allow-api-egress
+  namespace: ml-workflows
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  egress:
+    - ports:
+        - {protocol: TCP, port: 6443}

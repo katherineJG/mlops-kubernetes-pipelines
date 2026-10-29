@@ -1,14 +1,23 @@
 # Argo Workflows chart overrides. Key names are chart-specific: check against the pinned chart's
 # values (helm show values argo/argo-workflows --version <ARGO_CHART_VERSION>) before first install.
+# Images are pinned by digest (multi-arch index digests of the v4.1.6 tags); update the digest with the version.
 server:
   enabled: false   # UI not needed for the CLI-driven demo; smaller attack surface
 controller:
+  image:
+    tag: "v4.1.6@sha256:a012a639ead374a4a9306093d6b29dfdc7e6c4c1a85c684582cb961a6cc8bcf3"
   workflowNamespaces:
     - ml-workflows
+crds:
+  upgradeJob:
+    image:
+      tag: "v4.1.6@sha256:b9be70ef3f4a0709d771e9c098a99fd2d97be1b095c1b160c668a2fde61dc237"
 # Restricted pod-security in ml-workflows rejects the executor init/wait containers unless set.
 executor:
   image:
-    nonroot: true
+    # The non-root variant is chosen by the tag: the chart's `nonroot: true` option appends "-nonroot"
+    # to the tag, which cannot be combined with a digest.
+    tag: "v4.1.6-nonroot@sha256:07118f5964bf07320ab10bfbeb231143264c0787ca1bc333039ad7c02817130e"
   securityContext:
     runAsNonRoot: true
     runAsUser: 65532

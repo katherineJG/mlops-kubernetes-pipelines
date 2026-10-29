@@ -28,7 +28,7 @@ spec:
   securityContext: {runAsNonRoot: true, runAsUser: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
   containers:
     - name: p
-      image: busybox:1.37.0
+      image: busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
       command: [sh, -c]
       args: ["$1"]
       securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
