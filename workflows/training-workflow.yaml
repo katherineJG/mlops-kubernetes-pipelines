@@ -23,6 +23,8 @@ spec:
         value: /app/configs/model.yaml
       - name: source-revision
         value: unknown
+      - name: train-timeout  # seconds; a parameter so the timeout path can be tested with a tiny value
+        value: "600"
   securityContext:
     runAsNonRoot: true
     runAsUser: 65532
@@ -112,7 +114,7 @@ spec:
           - /artifacts/runs/{{workflow.name}}
 
     - name: train
-      activeDeadlineSeconds: 600
+      activeDeadlineSeconds: "{{workflow.parameters.train-timeout}}"
       retryStrategy:
         limit: "2"
         retryPolicy: Always
