@@ -1,0 +1,208 @@
+# ingest -> validate -> train -> evaluate -> promote, one pod per stage, files handed over the
+# `artifacts` PVC. Submit:  argo submit workflows/training-workflow.yaml -n ml-workflows -p source-revision=<git sha>
+# No YAML anchors on purpose: `argo lint` silently skips files that use them.
+#
+# Retry rule (same on every stage): retry pod-level errors, or exit code 1 (unexpected). Exit 10
+# (bad data), 20 (gate failed) and 30 (precondition) are deterministic and are never retried.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: churn-training-
+  namespace: ml-workflows
+spec:
+  serviceAccountName: ml-workflow
+  entrypoint: pipeline
+  activeDeadlineSeconds: 1200  # whole-run cap on top of the per-stage ones
+  arguments:
+    parameters:
+      - name: image
+        value: mlops-stages:m1-local
+      - name: data-config
+        value: /app/configs/data.yaml
+      - name: model-config
+        value: /app/configs/model.yaml
+      - name: source-revision
+        value: unknown
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+    - name: artifacts
+      persistentVolumeClaim:
+        claimName: artifacts
+    - name: tmp
+      emptyDir: {}
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          - name: ingest
+            template: ingest
+          - name: validate
+            depends: ingest.Succeeded
+            template: validate
+          - name: train
+            depends: validate.Succeeded
+            template: train
+          - name: evaluate
+            depends: train.Succeeded
+            template: evaluate
+          - name: promote
+            depends: evaluate.Succeeded
+            template: promote
+
+    - name: ingest
+      activeDeadlineSeconds: 120
+      retryStrategy:
+        limit: "2"
+        retryPolicy: Always
+        expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)
+        backoff: {duration: 5s, factor: "2"}
+      container:
+        image: "{{workflow.parameters.image}}"
+        imagePullPolicy: IfNotPresent
+        command: [python, -m]  # explicit: the emissary executor cannot read a local image's entrypoint
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: "1", memory: 512Mi}
+        args:
+          - churn_pipeline.ingest
+          - --config
+          - "{{workflow.parameters.data-config}}"
+          - --out
+          - /artifacts/runs/{{workflow.name}}/input
+
+    - name: validate
+      activeDeadlineSeconds: 120
+      retryStrategy:
+        limit: "2"
+        retryPolicy: Always
+        expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)
+        backoff: {duration: 5s, factor: "2"}
+      container:
+        image: "{{workflow.parameters.image}}"
+        imagePullPolicy: IfNotPresent
+        command: [python, -m]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {cpu: 500m, memory: 512Mi}
+        args:
+          - mlops_stages.validate
+          - --input-dir
+          - /artifacts/runs/{{workflow.name}}/input
+          - --run-dir
+          - /artifacts/runs/{{workflow.name}}
+
+    - name: train
+      activeDeadlineSeconds: 600
+      retryStrategy:
+        limit: "2"
+        retryPolicy: Always
+        expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)
+        backoff: {duration: 5s, factor: "2"}
+      container:
+        image: "{{workflow.parameters.image}}"
+        imagePullPolicy: IfNotPresent
+        command: [python, -m]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 500m, memory: 512Mi}
+          limits: {cpu: "2", memory: 2Gi}
+        args:
+          - mlops_stages.train
+          - --input-dir
+          - /artifacts/runs/{{workflow.name}}/input
+          - --run-dir
+          - /artifacts/runs/{{workflow.name}}
+          - --data-config
+          - "{{workflow.parameters.data-config}}"
+          - --model-config
+          - "{{workflow.parameters.model-config}}"
+
+    - name: evaluate
+      activeDeadlineSeconds: 300
+      retryStrategy:
+        limit: "2"
+        retryPolicy: Always
+        expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)
+        backoff: {duration: 5s, factor: "2"}
+      container:
+        image: "{{workflow.parameters.image}}"
+        imagePullPolicy: IfNotPresent
+        command: [python, -m]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 250m, memory: 512Mi}
+          limits: {cpu: "1", memory: 1Gi}
+        args:
+          - mlops_stages.evaluate
+          - --input-dir
+          - /artifacts/runs/{{workflow.name}}/input
+          - --run-dir
+          - /artifacts/runs/{{workflow.name}}
+          - --data-config
+          - "{{workflow.parameters.data-config}}"
+          - --model-config
+          - "{{workflow.parameters.model-config}}"
+
+    - name: promote
+      activeDeadlineSeconds: 60
+      retryStrategy:
+        limit: "2"
+        retryPolicy: Always
+        expression: lastRetry.status == "Error" || (lastRetry.status == "Failed" && asInt(lastRetry.exitCode) == 1)
+        backoff: {duration: 5s, factor: "2"}
+      container:
+        image: "{{workflow.parameters.image}}"
+        imagePullPolicy: IfNotPresent
+        command: [python, -m]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+        volumeMounts:
+          - {name: artifacts, mountPath: /artifacts}
+          - {name: tmp, mountPath: /tmp}
+        resources:
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {cpu: 200m, memory: 256Mi}
+        args:
+          - mlops_stages.promote
+          - --run-dir
+          - /artifacts/runs/{{workflow.name}}
+          - --registry-dir
+          - /artifacts/registry
+          - --source-revision
+          - "{{workflow.parameters.source-revision}}"
+          - --image
+          - "{{workflow.parameters.image}}"
