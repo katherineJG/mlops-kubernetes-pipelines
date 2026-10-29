@@ -2,7 +2,7 @@
 
 Status: the stage CLIs, image and Argo DAG run end to end on the local kind cluster. Resource limits
 are measured, security controls are verified, and the success, bad-data, failed-training, failed-gate,
-timeout and missing-artifact scenarios pass. The GitHub Actions workflow passes on GitHub, including the opt-in cluster job (run 40930087622).
+timeout and missing-artifact scenarios pass. The GitHub Actions workflow passes on GitHub, including the opt-in cluster job (run 40942671088).
 
 ## DAG
 

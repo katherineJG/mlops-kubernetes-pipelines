@@ -1,6 +1,6 @@
 # Evidence of runs
 
-Recorded 2026-10-29 on a local kind cluster (Kubernetes v1.36.4, Argo Workflows v4.1.6), freshly rebuilt with `scripts/cleanup.sh` then the documented setup. Produced by `tests/workflow/run-scenarios.sh` (all checks passed) and `tests/workflow/security-checks.sh` (all checks passed). The node-restart check (`--restart-node`) was run on the earlier cluster, not this one.
+Recorded 2026-10-29 on a local kind cluster (Kubernetes v1.36.4, Argo Workflows v4.1.6, Calico v3.33.0), freshly rebuilt with `scripts/cleanup.sh` and the documented setup. Produced by `tests/workflow/run-scenarios.sh` (all checks passed) and `tests/workflow/security-checks.sh --restart-node` (all checks passed, including the node-restart check).
 
 ## Workflow DAG
 
@@ -13,12 +13,12 @@ flowchart LR
 
 | Scenario | Run | Outcome | Attempts per stage | Registry |
 |---|---|---|---|---|
-| Success | `churn-training-88z8l` | Succeeded | each stage once, exit 0 | `current.json` points at this run |
-| Invalid data | `churn-training-gmdq6` | Failed at validate | validate once, exit 10 (no retry); train, evaluate, promote never started | unchanged |
-| Failed training | `churn-training-bx5l2` | Failed at train | train 3 times, all exit 1 (1 + 2 retries); evaluate, promote never started | unchanged |
-| Failed gate | `churn-training-rblcv` | Failed at evaluate | evaluate once, exit 20 (no retry); promote never started; `gate.json` has `passed: false` | unchanged |
-| Timeout | `churn-training-c7b7q` | Failed at train | train once, no exit code, "longer than the specified deadline", retry expression evaluated to false; evaluate, promote never started | unchanged |
-| Missing upstream artifact | `churn-training-9wdnz` | Failed at evaluate | `evaluate` submitted alone (`--entrypoint evaluate`), so `train.json` is absent: exit 30 once, no retry, log says "required artifact missing"; promote never started | unchanged |
+| Success | `churn-training-rp6s6` | Succeeded | each stage once, exit 0 | `current.json` points at this run |
+| Invalid data | `churn-training-f2s95` | Failed at validate | validate once, exit 10 (no retry); train, evaluate, promote never started | unchanged |
+| Failed training | `churn-training-zc5kp` | Failed at train | train 3 times, all exit 1 (1 + 2 retries); evaluate, promote never started | unchanged |
+| Failed gate | `churn-training-4mgf5` | Failed at evaluate | evaluate once, exit 20 (no retry); promote never started; `gate.json` has `passed: false` | unchanged |
+| Timeout | `churn-training-fvlg9` | Failed at train | train once, no exit code, "longer than the specified deadline", retry expression evaluated to false; evaluate, promote never started | unchanged |
+| Missing upstream artifact | `churn-training-vhkqk` | Failed at evaluate | `evaluate` submitted alone (`--entrypoint evaluate`), so `train.json` is absent: exit 30 once, no retry, log says "required artifact missing"; promote never started | unchanged |
 
 "Unchanged" means the SHA-256 of `registry/current.json` and the list of `registry/models/` were
 identical before and after, and no `registry/models/<run>` exists for the failed run.
@@ -27,9 +27,9 @@ These workflow objects live in the local cluster and disappear with it (`scripts
 
 ## CI
 
-GitHub Actions run 40930087622 (manual dispatch with the cluster job enabled, 2026-10-29): `static` and
+GitHub Actions run 40942671088 (manual dispatch with the cluster job enabled, 2026-10-29): `static` and
 `cluster` both succeeded. In `cluster`, the security checks and all six scenarios (success and five failures) passed on a fresh kind
-cluster on a GitHub-hosted runner (about 8 min). The same workflow ran on push and `static` passed.
+cluster on a GitHub-hosted runner (about 9 min, with Calico and the network and token checks). The same workflow ran on push and `static` passed.
 
 ## Resource simulations
 
