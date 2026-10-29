@@ -1,0 +1,114 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: "Also run the kind cluster tests (about 15 minutes)"
+        type: boolean
+        default: false
+
+env:
+  # Project 01 is a path dependency (../Reproducible ML Training Pipeline). Pinned to a commit so a
+  # change over there cannot silently break or alter this repo's CI.
+  PROJECT01_REPO: katherineJG/mlops-reproducible-training
+  PROJECT01_SHA: a3c18b12f5bf2f3ccf23c8c838e1bcd2ca4fcf07
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PROJECT01_REPO }}
+          ref: ${{ env.PROJECT01_SHA }}
+          path: Reproducible ML Training Pipeline
+      - uses: astral-sh/setup-uv@v5
+      - run: uv python install 3.12
+      - name: Install pinned tool versions
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          source versions.env
+          gh release download "$ARGO_VERSION" -R argoproj/argo-workflows \
+            -p argo-linux-amd64.gz -p argo-workflows-cli-checksums.txt
+          grep " argo-linux-amd64.gz$" argo-workflows-cli-checksums.txt | sha256sum -c -
+          gunzip argo-linux-amd64.gz && chmod +x argo-linux-amd64 && sudo mv argo-linux-amd64 /usr/local/bin/argo
+          helm repo add argo https://argoproj.github.io/argo-helm
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Lint and unit tests
+        working-directory: repo
+        run: |
+          uv sync --locked
+          uv run ruff check src tests
+          uv run pytest -q
+      - name: Workflow, manifest and script checks
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          source versions.env
+          argo lint --offline workflows/ tests/workflow/smoke.yaml
+          helm template argo-workflows argo/argo-workflows --version "$ARGO_CHART_VERSION" \
+            --namespace argo -f helm/values.yaml > /dev/null
+          for f in scripts/*.sh tests/workflow/*.sh; do bash -n "$f"; done
+          uv run python -c "import sys, yaml; [list(yaml.safe_load_all(open(f))) for f in sys.argv[1:]]" k8s/*.yaml
+      - name: Dockerfile builds on the Project 01 image
+        working-directory: repo
+        run: |
+          source versions.env
+          docker build -t "$BASE_IMAGE" "../Reproducible ML Training Pipeline"
+          docker build -f containers/Dockerfile --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$STAGE_IMAGE" .
+
+  # Opt-in: creates a kind cluster, installs Argo, runs the security checks and failure scenarios.
+  cluster:
+    if: github.event_name == 'workflow_dispatch' && inputs.cluster
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PROJECT01_REPO }}
+          ref: ${{ env.PROJECT01_SHA }}
+          path: Reproducible ML Training Pipeline
+      - name: Install kind and argo at the pinned versions
+        working-directory: repo
+        run: |
+          set -euo pipefail
+          source versions.env
+          curl -fsSLo kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x kind && sudo mv kind /usr/local/bin/kind
+          gh release download "$ARGO_VERSION" -R argoproj/argo-workflows \
+            -p argo-linux-amd64.gz -p argo-workflows-cli-checksums.txt
+          grep " argo-linux-amd64.gz$" argo-workflows-cli-checksums.txt | sha256sum -c -
+          gunzip argo-linux-amd64.gz && chmod +x argo-linux-amd64 && sudo mv argo-linux-amd64 /usr/local/bin/argo
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Build and load images
+        working-directory: repo
+        run: |
+          source versions.env
+          docker build -t "$BASE_IMAGE" "../Reproducible ML Training Pipeline"
+          docker build -f containers/Dockerfile --build-arg BASE_IMAGE="$BASE_IMAGE" -t "$STAGE_IMAGE" .
+      - name: Create cluster, load image, install Argo
+        working-directory: repo
+        run: |
+          source versions.env
+          ./scripts/create-cluster.sh
+          kind load docker-image "$STAGE_IMAGE" --name "$CLUSTER_NAME"
+          ./scripts/install-argo.sh
+      - name: Security checks
+        working-directory: repo
+        run: tests/workflow/security-checks.sh
+      - name: Failure and success scenarios
+        working-directory: repo
+        run: tests/workflow/run-scenarios.sh
