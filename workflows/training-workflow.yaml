@@ -77,7 +77,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 100m, memory: 160Mi}
-          limits: {cpu: "1", memory: 384Mi}  # measured peak 126 MiB
+          limits: {cpu: "1", memory: 1536Mi}  # peak 126 MiB at 5k rows, 1110 MiB at 2M
         args:
           - churn_pipeline.ingest
           - --config
@@ -105,7 +105,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 100m, memory: 160Mi}
-          limits: {cpu: 500m, memory: 384Mi}  # measured peak 137 MiB
+          limits: {cpu: "1", memory: 1280Mi}  # peak 137 MiB at 5k rows, 950 MiB at 2M
         args:
           - mlops_stages.validate
           - --input-dir
@@ -133,7 +133,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 500m, memory: 384Mi}
-          limits: {cpu: "2", memory: 768Mi}  # measured peak 267 MiB, ~2 cores for 2.5 s
+          limits: {cpu: "2", memory: 2560Mi}  # peak 266 MiB at 5k rows, 1987 MiB at 2M; uses up to ~3 cores
         args:
           - mlops_stages.train
           - --input-dir
@@ -165,7 +165,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 250m, memory: 384Mi}
-          limits: {cpu: "1", memory: 768Mi}  # measured peak 263 MiB
+          limits: {cpu: "1", memory: 1536Mi}  # peak 263 MiB at 5k rows, 1103 MiB at 2M
         args:
           - mlops_stages.evaluate
           - --input-dir
@@ -197,7 +197,7 @@ spec:
           - {name: tmp, mountPath: /tmp}
         resources:
           requests: {cpu: 50m, memory: 128Mi}
-          limits: {cpu: 200m, memory: 256Mi}  # measured peak 123 MiB (imports pandas via shared code)
+          limits: {cpu: 500m, memory: 256Mi}  # peak 123 MiB at any size (imports pandas via shared code)
         args:
           - mlops_stages.promote
           - --run-dir
